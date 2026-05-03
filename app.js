@@ -224,7 +224,17 @@ function startInstitutionalSession() {
 }
 
 function listenToRequestStatus() {
-    // Listen for current user's last request
+    // 1. Sync Announcement
+    db.ref(`institutions/${state.kurum}/announcement`).on('value', snap => {
+        const txt = snap.val() || "YurtAraç 2.0 Hoş Geldiniz!";
+        const el = document.getElementById('announcement-text');
+        if (el && el.textContent !== txt) {
+            el.textContent = txt;
+            VoiceManager.speak('Yeni bir idari duyuru alındı: ' + txt);
+        }
+    });
+
+    // 2. Sync Current Request/Trip Status
     db.ref(`institutions/${state.kurum}/requests`).orderByChild('userId').equalTo(state.user.id).on('value', snap => {
         const reqs = snap.val();
         if (!reqs) return updatePersonnelActionBtn('none');
@@ -272,18 +282,24 @@ function updatePersonnelActionBtn(mode) {
         txt.textContent = 'TALEP ONAYLANDI';
         btn.innerHTML = '<i data-lucide="play"></i> SÜRÜŞÜ BAŞLAT';
         btn.onclick = startTripFlow;
-        btn.className = 'main-action-btn success-pulse';
+        btn.className = 'main-action-btn success';
     } else if (mode === 'finish') {
         pill.classList.remove('hidden');
         pill.style.color = 'var(--primary)';
         txt.textContent = 'SÜRÜŞ DEVAM EDİYOR';
         btn.innerHTML = '<i data-lucide="square"></i> SÜRÜŞÜ BİTİR';
         btn.onclick = finishTripFlow;
-        btn.className = 'main-action-btn danger-pulse';
+        btn.className = 'main-action-btn'; 
+        document.getElementById('digital-key').classList.remove('hidden');
+        document.getElementById('expense-btn').classList.remove('hidden');
+    } else {
+        document.getElementById('digital-key').classList.add('hidden');
+        document.getElementById('expense-btn').classList.add('hidden');
     }
     lucide.createIcons();
     if (mode === 'start' && Notification.permission === 'granted') {
         NotificationManager.send('Talep Onaylandı!', 'Aracınız sürüşe hazır, başlatabilirsiniz.');
+        VoiceManager.speak('Talebiniz onaylandı. Aracınız sürüşe hazır.');
     }
 }
 
@@ -297,6 +313,17 @@ const NotificationManager = {
         if (Notification.permission === 'granted') {
             new Notification(title, { body, icon: './icon-512.png' });
         }
+    }
+};
+
+const VoiceManager = {
+    speak(text) {
+        if (!('speechSynthesis' in window)) return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'tr-TR';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        window.speechSynthesis.speak(utterance);
     }
 };
 
@@ -341,6 +368,12 @@ function initAdminDashboard() {
             renderApprovals(reqs);
         }
     });
+
+    // Sync Announcement
+    db.ref(`institutions/${state.kurum}/announcement`).on('value', snap => {
+        const el = document.getElementById('admin-announcement-input');
+        if (el) el.value = snap.val() || "";
+    });
 }
 
 function loadAdminStats() {
@@ -377,6 +410,13 @@ function loadAdminView(view) {
 async function renderAdminDashboard() {
     const container = document.getElementById('admin-content');
     container.innerHTML = `
+        <div class="glass-card p-4 mb-4">
+            <h6 class="text-emerald mb-2">Duyuru Yönetimi</h6>
+            <div class="d-flex gap-2">
+                <input id="admin-announcement-input" class="flex-grow-1 p-2 rounded bg-dark border-0 text-white">
+                <button onclick="updateAnnouncement()" class="btn-emerald">Güncelle</button>
+            </div>
+        </div>
         <div class="dashboard-grid stagger-container">
             <div class="glass-card p-4 stagger-item mb-4">
                 <h6 class="text-emerald mb-3"><i data-lucide="bar-chart"></i> Sürüş Yoğunluğu (Son 7 Gün)</h6>
@@ -427,13 +467,19 @@ async function renderAdminDashboard() {
         data: {
             labels: ['Aktif', 'Müsait'],
             datasets: [{
-                data: [trips.length, 10], // Mock "10" as total for now
+                data: [trips.length, 10],
                 backgroundColor: ['#10B981', 'rgba(255,255,255,0.1)'],
                 borderWidth: 0
             }]
         },
         options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#aaa', font: { size: 10 } } } } }
     });
+}
+
+function updateAnnouncement() {
+    const val = document.getElementById('admin-announcement-input').value;
+    db.ref(`institutions/${state.kurum}/announcement`).set(val);
+    Swal.fire('Başarılı', 'Duyuru güncellendi.', 'success');
 }
 
 async function renderReports() {
@@ -501,10 +547,80 @@ function renderApprovals(reqsObj) {
     container.innerHTML = html || `<div class="empty-state">Bekleyen onay bulunmuyor.</div>`;
 }
 
+// ---------- ELITE FEATURES: SIGNATURE & EXPENSE ----------
+let sigContext = null;
+let isDrawing = false;
+
+function initSignaturePad() {
+    const canvas = document.getElementById('signature-pad');
+    if (!canvas) return;
+    sigContext = canvas.getContext('2d');
+    sigContext.strokeStyle = '#050505';
+    sigContext.lineWidth = 3;
+    
+    const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+
+    const start = (e) => { isDrawing = true; const p = getPos(e); sigContext.beginPath(); sigContext.moveTo(p.x, p.y); };
+    const move = (e) => { if (!isDrawing) return; const p = getPos(e); sigContext.lineTo(p.x, p.y); sigContext.stroke(); };
+    const end = () => { isDrawing = false; };
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start);
+    canvas.addEventListener('touchmove', move);
+    canvas.addEventListener('touchend', end);
+}
+
+window.clearSignature = () => {
+    const canvas = document.getElementById('signature-pad');
+    sigContext.clearRect(0, 0, canvas.width, canvas.height);
+};
+
+window.confirmSignature = () => {
+    state.signatureData = document.getElementById('signature-pad').toDataURL();
+    document.getElementById('signature-modal').classList.add('hidden');
+    submitTripFinish();
+};
+
+window.addExpenseFlow = async () => {
+    const { value: formValues } = await Swal.fire({
+        title: 'Yakıt Masrafı',
+        html: '<input id="swal-amt" class="swal2-input" type="number" placeholder="Tutar (TL)">' +
+              '<input id="swal-liters" class="swal2-input" type="number" placeholder="Litre">',
+        preConfirm: () => ({ 
+            amount: document.getElementById('swal-amt').value, 
+            liters: document.getElementById('swal-liters').value 
+        })
+    });
+    if(formValues && formValues.amount) {
+        db.ref(`institutions/${state.kurum}/expenses`).push({ 
+            ...formValues, 
+            userName: state.user.name, 
+            plate: state.activeTrip.vehiclePlate,
+            timestamp: Date.now() 
+        });
+        Swal.fire('Başarılı', 'Masraf idareciye iletildi.', 'success');
+    }
+};
+
+window.toggleKeyAnimation = () => {
+    const key = document.getElementById('digital-key');
+    key.style.animation = 'none';
+    setTimeout(() => key.style.animation = 'key-float 0.5s ease-in-out', 10);
+    Swal.fire({ title: 'Araç Açıldı', text: 'Kapılar kilitlendi/açıldı.', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+};
+
 // ---------- LOGIC: PERSONNEL PANEL ----------
 function initPersonnelDashboard() {
     document.getElementById('user-display-name').textContent = state.user.name;
     initMap();
+    initSignaturePad();
     updateProfileUI();
     loadPersonnelHistory();
 
@@ -519,6 +635,9 @@ function initPersonnelDashboard() {
             document.querySelectorAll('.p-view').forEach(v => v.classList.remove('active'));
             document.getElementById(`personnel-${view}`).classList.add('active');
 
+            if (view === 'main' && state.lmap) {
+                setTimeout(() => state.lmap.invalidateSize(), 100);
+            }
             if (view === 'requests') loadPersonnelHistory();
         });
     });
@@ -559,36 +678,14 @@ async function loadPersonnelHistory() {
         const duration = Math.round((new Date(t.finishTime) - new Date(t.startTime)) / 60000); // minutes
         return `
             <div class="report-card glass-card mb-3 stagger-item p-4">
-                <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="fw-bold text-white h6 mb-0">${t.vehiclePlate}</div>
                         <div class="x-small text-muted">${new Date(t.timestamp).toLocaleDateString('tr-TR')}</div>
                     </div>
                     <div class="badge-km shadow-neon">+${kmDiff} KM</div>
                 </div>
-                <div class="stats-mini-grid mb-4">
-                    <div class="stat-box">
-                        <span id="profile-total-trips" class="d-block h5 fw-bold text-emerald mb-0">0</span>
-                        <span class="x-small text-muted">Sürüş</span>
-                    </div>
-                    <div class="stat-box">
-                        <span id="profile-total-km" class="d-block h5 fw-bold text-emerald mb-0">0</span>
-                        <span class="x-small text-muted">Top. KM</span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="x-small text-muted d-block">Rol</label>
-                    <span class="fw-bold">Personel / Şoför</span>
-                </div>
-                <div class="history-detail-grid mb-3">
-                    <div class="detail-item">
-                        <i data-lucide="clock"></i> <span>${duration} dk</span>
-                    </div>
-                    <div class="detail-item">
-                        <i data-lucide="droplets"></i> <span>%${t.fuelStart} → %${t.fuelEnd}</span>
-                    </div>
-                </div>
-                <p class="x-small text-white opacity-50 mb-0"><i data-lucide="map-pin"></i> ${t.purpose}</p>
+                <div class="mt-2 x-small text-white opacity-50"><i data-lucide="map-pin"></i> ${t.purpose}</div>
             </div>
         `;
     }).join('');
@@ -602,6 +699,7 @@ function initMap() {
     // Ümraniye Yamanevler Center
     const center = [41.0287, 29.1121];
     const lmap = L.map('map', { zoomControl: false, attributionControl: false }).setView(center, 16);
+    state.lmap = lmap;
     
     // Dark/Modern Tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(lmap);
@@ -685,6 +783,7 @@ async function startTripFlow() {
             startKm: km,
             startTime: new Date().toISOString()
         });
+        VoiceManager.speak('Sürüş başlatıldı. Lütfen trafik kurallarına uyunuz. İyi yolculuklar.');
         Swal.fire('Sürüş Başladı', 'İyi yolculuklar!', 'success');
     }
 }
@@ -771,7 +870,9 @@ function finishCamera() {
     if (state.camera.type === 'start') {
         submitRequest();
     } else {
-        submitTripFinish();
+        // Show Signature Modal before finishing
+        document.getElementById('signature-modal').classList.remove('hidden');
+        initSignaturePad();
     }
 }
 
@@ -800,6 +901,7 @@ async function submitTripFinish() {
         fuelEnd: state.finishFuel,
         finishTime: new Date().toISOString(),
         photosEnd: state.camera.photos,
+        signature: state.signatureData || null,
         status: 'completed'
     };
 
@@ -879,15 +981,22 @@ async function loadVehicleList() {
         return;
     }
     listEl.innerHTML = Object.values(vehs).map(v => `
-        <div class="list-item glass-card mb-2 stagger-item">
-            <div class="d-flex align-items-center gap-3">
-                <div class="badge-km"><i data-lucide="car"></i></div>
-                <div>
-                    <div class="fw-bold">${v.model}</div>
-                    <div class="x-small text-muted">${v.plate}</div>
+        <div class="list-item glass-card mb-3 stagger-item p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="badge-km"><i data-lucide="truck"></i></div>
+                    <div>
+                        <div class="fw-bold">${v.model}</div>
+                        <div class="x-small text-muted">${v.plate}</div>
+                    </div>
                 </div>
+                <button class="btn-icon opacity-50" onclick="deleteVehicle('${v.id}')"><i data-lucide="trash-2" style="width:14px;"></i></button>
             </div>
-            <button class="btn-icon text-danger" onclick="deleteVehicle('${v.id}')"><i data-lucide="trash-2"></i></button>
+            <div class="vehicle-health mt-3">
+                <div class="h-item"><span>Yağ:</span> <div class="h-bar"><div class="h-fill bg-success" style="width: 85%"></div></div></div>
+                <div class="h-item"><span>Lastik:</span> <div class="h-bar"><div class="h-fill bg-warning" style="width: 75%"></div></div></div>
+                <div class="h-item"><span>Motor:</span> <div class="h-bar"><div class="h-fill bg-success" style="width: 98%"></div></div></div>
+            </div>
         </div>
     `).join('');
     lucide.createIcons();
