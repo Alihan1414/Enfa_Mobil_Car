@@ -50,10 +50,8 @@ body, html {
     100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-.danger-pulse {
-    background: var(--danger) !important;
-    animation: danger-glow 2s infinite;
-}
+.bg-danger { background: rgba(239, 68, 68, 0.2) !important; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.danger-pulse { animation: none; background: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
 
 @keyframes danger-glow {
     0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
@@ -276,6 +274,45 @@ input, .custom-select {
     padding: 30px;
     z-index: 1000;
 }
+.app {
+    width: 100%;
+    max-width: 500px;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0 auto;
+    background-color: var(--bg-dark);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-bottom: 80px;
+    display: flex;
+    flex-direction: column;
+}
+
+#map {
+    width: 100%;
+    flex-grow: 1;
+    z-index: 1;
+    min-height: 450px;
+}
+
+.btn-emerald {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.btn-emerald:hover { filter: brightness(1.2); box-shadow: 0 0 10px var(--primary-glow); }
 .gate-view.active { display: flex; }
 
 .gate-content {
@@ -363,6 +400,70 @@ input:focus { border-color: var(--primary); }
 
 .login-form-container { display: none; flex-direction: column; gap: 15px; }
 .login-form-container.active { display: flex; }
+
+/* --- ELITE FEATURES: KEY, EXPENSE, SIGNATURE --- */
+.digital-key {
+    position: absolute;
+    top: -120px;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 25px var(--primary-glow);
+    border: 2px solid rgba(255,255,255,0.2);
+    animation: key-float 2s infinite ease-in-out;
+    cursor: pointer;
+    z-index: 10;
+}
+.digital-key i { color: white; width: 30px; height: 30px; }
+
+@keyframes key-float {
+    0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 20px var(--primary-glow); }
+    50% { transform: translateY(-15px) scale(1.1); box-shadow: 0 0 40px var(--primary-glow); }
+}
+
+.expense-trigger {
+    background: rgba(255, 193, 7, 0.15);
+    border: 1px solid #ffc107;
+    color: #ffc107;
+    padding: 10px 20px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    cursor: pointer;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.signature-container {
+    background: white;
+    border-radius: 12px;
+    padding: 10px;
+    margin: 15px 0;
+}
+
+.signature-canvas {
+    border: 1px dashed #ccc;
+    touch-action: none;
+    cursor: crosshair;
+}
 
 /* Panel Structures */
 .role-panel {
@@ -608,3 +709,19 @@ marquee {
 .empty-state { text-align: center; color: var(--gray); padding: 40px 0; }
 .warning-text { color: var(--warning); font-weight: 600; margin-top: 5px; }
 .small-note { font-size: 0.85rem; color: var(--gray); margin-bottom: 10px; }
+
+/* --- VEHICLE HEALTH BARS --- */
+.vehicle-health {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 10px;
+    margin-top: 10px;
+}
+.h-item { display: flex; align-items: center; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); }
+.h-bar { width: 60%; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+.h-fill { height: 100%; border-radius: 2px; }
+.bg-success { background: var(--primary) !important; box-shadow: 0 0 5px var(--primary-glow); }
+.bg-warning { background: #ffc107 !important; box-shadow: 0 0 5px rgba(255, 193, 7, 0.4); }
+.bg-danger { background: rgba(239, 68, 68, 0.2) !important; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
