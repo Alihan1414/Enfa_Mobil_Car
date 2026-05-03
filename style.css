@@ -88,13 +88,77 @@ body, html {
     margin-bottom: 15px;
 }
 
+/* --- MAP MARKERS --- */
+.veh-marker-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.veh-marker {
+    background: var(--primary);
+    color: white;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    border: 2px solid white;
+}
+
+/* --- STATS & DETAILS --- */
+.stats-mini-grid {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(255,255,255,0.02);
+    padding: 15px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.stat-box { text-align: center; flex: 1; }
+
+.history-detail-grid {
+    display: flex;
+    gap: 15px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.detail-item i { width: 14px; height: 14px; color: var(--primary); }
+
+.v-plate {
+    position: absolute;
+    bottom: -20px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid var(--primary);
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
 .badge-km {
-    background: rgba(16, 185, 129, 0.2);
+    background: var(--primary-glow);
     color: var(--primary);
-    padding: 4px 10px;
-    border-radius: 10px;
+    padding: 6px 12px;
+    border-radius: 12px;
     font-weight: 800;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
 }
 
 .km-stats {
@@ -128,31 +192,50 @@ input, .custom-select {
     animation: fadeIn 0.4s forwards;
 }
 
-@keyframes fadeIn {
-    to { opacity: 1; transform: translateY(0); }
+    /* --- LOGIN BUBBLES --- */
+    .login-bubble {
+        position: absolute;
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1), transparent);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        animation: bubble-float linear infinite;
+    }
+
+    @keyframes bubble-float {
+        0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+        10% { opacity: 0.3; }
+        90% { opacity: 0.3; }
+        100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+    }
+
+/* --- ELITE SPLASH --- */
+.splash-screen {
+    position: fixed; inset: 0;
+    background: #050505;
+    display: flex; justify-content: center; align-items: center;
+    z-index: 9999;
+    transition: all 0.8s cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* Splash Screen */
-.splash-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--primary);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    transition: opacity 0.6s ease;
+.logo-reveal {
+    text-align: center;
+    animation: logo-zoom 2s ease-out;
+}
+
+@keyframes logo-zoom {
+    0% { transform: scale(0.8); opacity: 0; filter: blur(20px); }
+    100% { transform: scale(1); opacity: 1; filter: blur(0px); }
 }
 
 .yurtarac-logo {
-    color: var(--white);
-    font-size: 3rem;
-    font-weight: 800;
-    margin-bottom: 20px;
-    text-align: center;
+    font-size: 4rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff, #10B981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.5));
+    letter-spacing: -2px;
 }
 
 .loading-bar {
@@ -202,18 +285,25 @@ input, .custom-select {
 }
 
 .brand-badge {
-    width: 80px;
-    height: 80px;
-    background: var(--primary);
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: white;
-    border-radius: 20px;
+    border-radius: 30px;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 2rem;
-    font-weight: 800;
+    font-size: 2.5rem;
+    font-weight: 900;
     margin: 0 auto 30px auto;
-    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 15px 35px var(--primary-glow);
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: badge-float 3s infinite ease-in-out;
+}
+
+@keyframes badge-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
 .gate-content h2 { font-size: 2rem; color: var(--dark); margin-bottom: 10px; }
@@ -279,10 +369,38 @@ input:focus { border-color: var(--primary); }
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+   /* --- DASHBOARD & NAV --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 10px;
+}
+
+.admin-nav {
     display: flex;
-    flex-direction: column;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 15px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.admin-nav .menu-btn {
+    white-space: nowrap;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    border-radius: 12px;
+}
+
+#announcement-banner {
+    border: 1px solid var(--primary-glow);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+}
+
+marquee {
+    color: var(--white);
+}
     background: var(--bg-light);
 }
 
