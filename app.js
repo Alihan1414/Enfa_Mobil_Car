@@ -142,7 +142,10 @@ async function handleInstitutionEntry() {
         loadPersonnelList(config.personnel);
     }
 
-    showGate('login');
+    // Run Car Transition before showing login
+    triggerCarTransition(() => {
+        showGate('login');
+    });
 }
 
 function loadPersonnelList(personnelObj) {
@@ -1124,5 +1127,24 @@ function toggleTheme() {
     const body = document.body;
     body.classList.toggle('light-mode');
     const isLight = body.classList.contains('light-mode');
-    localStorage.setItem('yurtarac_theme', isLight ? 'light' : 'dark');
+    localStorage.setItem('yurtarac_session', isLight ? 'light' : 'dark');
+}
+
+function triggerCarTransition(callback) {
+    const overlay = document.getElementById('car-transition');
+    if (!overlay) return callback();
+
+    overlay.classList.add('active');
+    overlay.classList.add('car-run-anim');
+
+    // Midway through the 1.2s animation, switch screens
+    setTimeout(() => {
+        callback();
+    }, 600);
+
+    // Clean up
+    setTimeout(() => {
+        overlay.classList.remove('active');
+        overlay.classList.remove('car-run-anim');
+    }, 1300);
 }
