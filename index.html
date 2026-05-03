@@ -112,8 +112,16 @@
                         </div>
                         <div id="map"></div>
                         <div class="floating-controls">
+                            <div id="digital-key" class="digital-key hidden" onclick="toggleKeyAnimation()">
+                                <i data-lucide="key"></i>
+                            </div>
                             <div id="request-status-pill" class="status-pill hidden">
-                                <span class="pulse"></span> <span id="status-text">ONAY BEKLİYOR</span>
+                                <span class="pulse-dot"></span>
+                                <span id="status-text">-</span>
+                            </div>
+                            <div id="expense-btn" class="expense-trigger hidden" onclick="addExpenseFlow()">
+                                <i data-lucide="receipt"></i>
+                                <span>YAKIT EKLE</span>
                             </div>
                             <button id="btn-action-main" class="main-action-btn">
                                 <i data-lucide="car"></i> Araç Talep Et
@@ -235,6 +243,21 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
+    <!-- Signature Modal -->
+    <div id="signature-modal" class="modal-overlay hidden">
+        <div class="glass-card p-4 text-center" style="width: 90%; max-width: 400px; border: 1px solid var(--primary-glow);">
+            <h5 class="text-emerald mb-3">Sürüş Sonu İmzası</h5>
+            <p class="x-small text-muted mb-3">Aracı hasarsız teslim ettiğinize dair imzalayın.</p>
+            <div class="signature-container">
+                <canvas id="signature-pad" width="350" height="200"></canvas>
+            </div>
+            <div class="d-flex gap-2 mt-4">
+                <button class="btn-icon bg-danger text-white w-25" onclick="clearSignature()"><i data-lucide="rotate-ccw"></i></button>
+                <button class="primary-btn w-75" onclick="confirmSignature()">SÜRÜŞÜ ARŞİVLE</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
