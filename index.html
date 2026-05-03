@@ -18,18 +18,25 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10B981">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 +    <div class="aurora-container"></div>
 
     <!-- Splash Screen -->
-    <div id="splash-screen" class="splash-screen" style="background-color: #10B981 !important;">
-        <div class="logo-container">
-            <div class="brand-icon">🚐</div>
+    <div id="splash-screen" class="splash-screen">
+        <div id="loginBubbles" class="bubbles-overlay"></div>
+        <div class="logo-reveal">
+            <div class="brand-badge shadow-neon mx-auto mb-4">YA</div>
             <div class="yurtarac-logo">YurtAraç</div>
-            <div class="loading-bar"></div>
+            <div class="loading-bar mt-4"></div>
         </div>
     </div>
 
@@ -97,6 +104,12 @@
                 <div class="panel-body">
                     <!-- Personnel Map View -->
                     <div id="personnel-main" class="p-view active">
+                        <div id="announcement-banner" class="glass-card m-3 p-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge-km bg-warning text-white"><i data-lucide="megaphone" style="width:14px; height:14px;"></i> DUYURU</span>
+                                <marquee id="announcement-text" class="x-small fw-bold opacity-75">YurtAraç 2.0 Elite Edition Yayında! Lütfen sürüş sonu fotoğraflarını net çekiniz.</marquee>
+                            </div>
+                        </div>
                         <div id="map"></div>
                         <div class="floating-controls">
                             <div id="request-status-pill" class="status-pill hidden">
@@ -123,6 +136,16 @@
                             <h2 id="profile-name" class="h4 mb-1">-</h2>
                             <p id="profile-kurum" class="x-small text-emerald fw-bold mb-4">-</p>
                             <div class="text-start border-top border-secondary border-opacity-25 pt-4">
+                                <div class="stats-mini-grid mb-4">
+                                    <div class="stat-box">
+                                        <span id="profile-total-trips" class="d-block h5 fw-bold text-emerald mb-0">0</span>
+                                        <span class="x-small text-muted">Sürüş</span>
+                                    </div>
+                                    <div class="stat-box border-start border-secondary border-opacity-25 ps-3">
+                                        <span id="profile-total-km" class="d-block h5 fw-bold text-emerald mb-0">0</span>
+                                        <span class="x-small text-muted">Top. KM</span>
+                                    </div>
+                                </div>
                                 <div class="mb-3">
                                     <label class="x-small text-muted d-block">Rol</label>
                                     <span class="fw-bold">Personel / Şoför</span>
@@ -165,20 +188,16 @@
                         </div>
                     </div>
 
-                    <div class="admin-menu">
-                        <button class="menu-btn active" data-aview="approvals">
-                            <i data-lucide="clipboard-check"></i> Onay Kuyruğu <span class="count-badge hidden" id="approval-count">0</span>
-                        </button>
-                        <button class="menu-btn" data-aview="vehicles">
-                            <i data-lucide="car"></i> Araç Filosu
-                        </button>
-                        <button class="menu-btn" data-aview="personnel">
-                            <i data-lucide="users"></i> Personel Listesi
-                        </button>
-                        <button class="menu-btn" data-aview="reports">
-                            <i data-lucide="bar-chart-2"></i> Raporlar
-                        </button>
-                    </div>
+                    <nav class="admin-nav">
+                    <button class="menu-btn active" data-aview="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+                    <button class="menu-btn" data-aview="approvals">
+                        <i data-lucide="check-square"></i> Onaylar
+                        <span id="approval-count" class="nav-badge hidden">0</span>
+                    </button>
+                    <button class="menu-btn" data-aview="vehicles"><i data-lucide="truck"></i> Araçlar</button>
+                    <button class="menu-btn" data-aview="personnel"><i data-lucide="users"></i> Personel</button>
+                    <button class="menu-btn" data-aview="reports"><i data-lucide="file-text"></i> Raporlar</button>
+                </nav>
 
                     <div id="admin-content" class="admin-view-content">
                         <!-- Views will be injected here -->
