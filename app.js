@@ -1,5 +1,9 @@
-// YurtAraç Institutional Management System - Core Logic
-// Integrated with Firebase Realtime Database (TopClean DB)
+// Register PWA Service Worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('YurtAraç SW Registered'))
+        .catch(err => console.error('SW Registration Failed', err));
+}
 
 // ---------- FIREBASE CONFIGURATION ----------
 const firebaseConfig = {
@@ -55,15 +59,12 @@ function showPanel(id) {
 
 // ---------- BOOTSTRAP ----------
 window.addEventListener('load', () => {
-    // Splash screen removal
+    // Cinematic Splash Transition
     setTimeout(() => {
-        document.getElementById('splash-screen').style.opacity = '0';
-        setTimeout(() => {
-            document.getElementById('splash-screen').style.display = 'none';
-            document.getElementById('app').classList.remove('hidden');
-            checkStoredSession();
-        }, 600);
-    }, 2000);
+        triggerLoginCinematic();
+        document.getElementById('app').classList.remove('hidden');
+        checkStoredSession();
+    }, 2500);
 
     initEventListeners();
     lucide.createIcons();
@@ -197,13 +198,14 @@ async function handlePersonnelLogin() {
 
     state.user = pData;
     state.role = 'personnel';
+    NotificationManager.requestPermission();
     startInstitutionalSession();
 }
 
 function startInstitutionalSession() {
     // Hide Gates
     document.querySelectorAll('.gate-view').forEach(g => g.classList.remove('active'));
-    
+
     // Save to LocalStorage
     localStorage.setItem('yurtarac_session', JSON.stringify({
         kurum: state.kurum,
@@ -226,11 +228,11 @@ function listenToRequestStatus() {
     db.ref(`institutions/${state.kurum}/requests`).orderByChild('userId').equalTo(state.user.id).on('value', snap => {
         const reqs = snap.val();
         if (!reqs) return updatePersonnelActionBtn('none');
-        
+
         // Get the latest one
-        const sorted = Object.keys(reqs).map(id => ({id, ...reqs[id]})).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const sorted = Object.keys(reqs).map(id => ({ id, ...reqs[id] })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         const last = sorted[0];
-        
+
         if (last.status === 'pending') {
             updatePersonnelActionBtn('pending');
         } else if (last.status === 'approved') {
@@ -249,9 +251,9 @@ function updatePersonnelActionBtn(mode) {
     const btn = document.getElementById('btn-action-main');
     const pill = document.getElementById('request-status-pill');
     const txt = document.getElementById('status-text');
-    
+
     btn.onclick = null;
-    
+
     if (mode === 'none') {
         pill.classList.add('hidden');
         btn.innerHTML = '<i data-lucide="car"></i> Araç Talep Et';
@@ -280,7 +282,23 @@ function updatePersonnelActionBtn(mode) {
         btn.className = 'main-action-btn danger-pulse';
     }
     lucide.createIcons();
+    if (mode === 'start' && Notification.permission === 'granted') {
+        NotificationManager.send('Talep Onaylandı!', 'Aracınız sürüşe hazır, başlatabilirsiniz.');
+    }
 }
+
+const NotificationManager = {
+    async requestPermission() {
+        if (!('Notification' in window)) return;
+        const permission = await Notification.requestPermission();
+        return permission === 'granted';
+    },
+    send(title, body) {
+        if (Notification.permission === 'granted') {
+            new Notification(title, { body, icon: './icon-512.png' });
+        }
+    }
+};
 
 function handleLogout() {
     localStorage.removeItem('yurtarac_session');
@@ -291,8 +309,8 @@ function handleLogout() {
 function initAdminDashboard() {
     document.getElementById('admin-inst-display').textContent = state.kurum;
     loadAdminStats();
-    loadAdminView('approvals');
-    
+    loadAdminView('dashboard');
+
     // Listen for menu clicks
     document.querySelectorAll('.menu-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -317,7 +335,7 @@ function initAdminDashboard() {
             badge.classList.add('hidden');
         }
         document.getElementById('stat-pending-reqs').textContent = pending;
-        
+
         // If current aview is approvals, refresh
         if (document.querySelector('.menu-btn[data-aview="approvals"]').classList.contains('active')) {
             renderApprovals(reqs);
@@ -341,7 +359,9 @@ function loadAdminView(view) {
     const container = document.getElementById('admin-content');
     container.innerHTML = `<div class="p-4 text-center">Yükleniyor...</div>`;
 
-    if (view === 'approvals') {
+    if (view === 'dashboard') {
+        renderAdminDashboard();
+    } else if (view === 'approvals') {
         db.ref(`institutions/${state.kurum}/requests`).once('value', snap => {
             renderApprovals(snap.val());
         });
@@ -354,11 +374,73 @@ function loadAdminView(view) {
     }
 }
 
+async function renderAdminDashboard() {
+    const container = document.getElementById('admin-content');
+    container.innerHTML = `
+        <div class="dashboard-grid stagger-container">
+            <div class="glass-card p-4 stagger-item mb-4">
+                <h6 class="text-emerald mb-3"><i data-lucide="bar-chart"></i> Sürüş Yoğunluğu (Son 7 Gün)</h6>
+                <canvas id="chart-trips" height="150"></canvas>
+            </div>
+            <div class="glass-card p-4 stagger-item">
+                <h6 class="text-emerald mb-3"><i data-lucide="pie-chart"></i> Araç Kullanım Oranı</h6>
+                <canvas id="chart-vehicles" height="150"></canvas>
+            </div>
+        </div>
+    `;
+    lucide.createIcons();
+
+    // Fetch Trip Data
+    const snap = await db.ref(`institutions/${state.kurum}/trips`).once('value');
+    const trips = snap.val() ? Object.values(snap.val()) : [];
+
+    // Process Last 7 Days
+    const counts = [0,0,0,0,0,0,0];
+    const labels = [];
+    for(let i=6; i>=0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString('tr-TR', { weekday: 'short' }));
+        const dStr = d.toLocaleDateString('tr-TR');
+        counts[6-i] = trips.filter(t => new Date(t.timestamp).toLocaleDateString('tr-TR') === dStr).length;
+    }
+
+    new Chart(document.getElementById('chart-trips'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Sürüşler',
+                data: counts,
+                backgroundColor: '#10B981',
+                borderRadius: 5
+            }]
+        },
+        options: { 
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }
+        }
+    });
+
+    new Chart(document.getElementById('chart-vehicles'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Aktif', 'Müsait'],
+            datasets: [{
+                data: [trips.length, 10], // Mock "10" as total for now
+                backgroundColor: ['#10B981', 'rgba(255,255,255,0.1)'],
+                borderWidth: 0
+            }]
+        },
+        options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#aaa', font: { size: 10 } } } } }
+    });
+}
+
 async function renderReports() {
     const container = document.getElementById('admin-content');
     const snap = await db.ref(`institutions/${state.kurum}/trips`).once('value');
     const trips = snap.val();
-    
+
     if (!trips) {
         container.innerHTML = `<div class="empty-state">Henüz tamamlanan sürüş yok.</div>`;
         return;
@@ -382,7 +464,7 @@ async function renderReports() {
             </div>
         </div>
     `).join('');
-    
+
     container.innerHTML = html;
 }
 
@@ -425,9 +507,9 @@ function initPersonnelDashboard() {
     initMap();
     updateProfileUI();
     loadPersonnelHistory();
-    
+
     document.getElementById('btn-action-main').addEventListener('click', handleMainAction);
-    
+
     // Bottom Nav
     document.querySelectorAll('.nav-item').forEach(nav => {
         nav.addEventListener('click', () => {
@@ -436,68 +518,119 @@ function initPersonnelDashboard() {
             nav.classList.add('active');
             document.querySelectorAll('.p-view').forEach(v => v.classList.remove('active'));
             document.getElementById(`personnel-${view}`).classList.add('active');
-            
+
             if (view === 'requests') loadPersonnelHistory();
         });
     });
 }
 
-function updateProfileUI() {
+async function updateProfileUI() {
     document.getElementById('profile-name').textContent = state.user.name;
     document.getElementById('profile-kurum').textContent = state.kurum;
     document.getElementById('profile-kurum-full').textContent = state.kurum + " Kurumsal Araç Filosu";
+
+    // Calculate Stats
+    const snap = await db.ref(`institutions/${state.kurum}/trips`).orderByChild('userId').equalTo(state.user.id).once('value');
+    const trips = snap.val();
+    if (trips) {
+        const tripList = Object.values(trips);
+        const totalTrips = tripList.length;
+        const totalKm = tripList.reduce((acc, t) => acc + (parseInt(t.finishKm) - parseInt(t.startKm)), 0);
+
+        document.getElementById('profile-total-trips').textContent = totalTrips;
+        document.getElementById('profile-total-km').textContent = totalKm;
+    }
 }
 
 async function loadPersonnelHistory() {
     const list = document.getElementById('personnel-history-list');
     if (!list) return;
-    
+
     const snap = await db.ref(`institutions/${state.kurum}/trips`).orderByChild('userId').equalTo(state.user.id).once('value');
     const trips = snap.val();
-    
+
     if (!trips) {
         list.innerHTML = '<div class="empty-state">Henüz bir sürüş kaydı yok.</div>';
         return;
     }
-    
-    list.innerHTML = Object.values(trips).reverse().map(t => `
-        <div class="report-card glass-card mb-3 stagger-item">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold text-emerald">${t.vehiclePlate}</span>
-                <span class="x-small text-muted">${new Date(t.timestamp).toLocaleDateString('tr-TR')}</span>
+
+    list.innerHTML = Object.values(trips).reverse().map(t => {
+        const kmDiff = parseInt(t.finishKm) - parseInt(t.startKm);
+        const duration = Math.round((new Date(t.finishTime) - new Date(t.startTime)) / 60000); // minutes
+        return `
+            <div class="report-card glass-card mb-3 stagger-item p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="fw-bold text-white h6 mb-0">${t.vehiclePlate}</div>
+                        <div class="x-small text-muted">${new Date(t.timestamp).toLocaleDateString('tr-TR')}</div>
+                    </div>
+                    <div class="badge-km shadow-neon">+${kmDiff} KM</div>
+                </div>
+                <div class="stats-mini-grid mb-4">
+                    <div class="stat-box">
+                        <span id="profile-total-trips" class="d-block h5 fw-bold text-emerald mb-0">0</span>
+                        <span class="x-small text-muted">Sürüş</span>
+                    </div>
+                    <div class="stat-box">
+                        <span id="profile-total-km" class="d-block h5 fw-bold text-emerald mb-0">0</span>
+                        <span class="x-small text-muted">Top. KM</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="x-small text-muted d-block">Rol</label>
+                    <span class="fw-bold">Personel / Şoför</span>
+                </div>
+                <div class="history-detail-grid mb-3">
+                    <div class="detail-item">
+                        <i data-lucide="clock"></i> <span>${duration} dk</span>
+                    </div>
+                    <div class="detail-item">
+                        <i data-lucide="droplets"></i> <span>%${t.fuelStart} → %${t.fuelEnd}</span>
+                    </div>
+                </div>
+                <p class="x-small text-white opacity-50 mb-0"><i data-lucide="map-pin"></i> ${t.purpose}</p>
             </div>
-            <p class="x-small text-white opacity-75 mb-2">📍 ${t.purpose}</p>
-            <div class="km-stats">
-                <div><span>KM:</span> ${t.startKm} - ${t.finishKm}</div>
-                <div class="badge-km ms-auto">${t.finishKm - t.startKm} KM</div>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+    lucide.createIcons();
 }
 
 function initMap() {
     const mapDiv = document.getElementById('map');
     if (!mapDiv) return;
-    const lmap = L.map('map', { zoomControl: false, attributionControl: false }).setView([41.0082, 28.9784], 14);
+    
+    // Ümraniye Yamanevler Center
+    const center = [41.0287, 29.1121];
+    const lmap = L.map('map', { zoomControl: false, attributionControl: false }).setView(center, 16);
+    
+    // Dark/Modern Tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(lmap);
     
+    const markers = {};
+
     // Fetch and render institution vehicles
     db.ref(`institutions/${state.kurum}/config/vehicles`).on('value', snap => {
         const vehs = snap.val();
         if (vehs) {
             Object.values(vehs).forEach(v => {
-                const icon = L.divIcon({
-                    className: 'veh-marker',
-                    html: `<div class="pin"><i data-lucide="car"></i></div>`,
-                    iconSize: [40, 40]
-                });
-                L.marker([v.lat || 41.0082, v.lng || 28.9784], { icon }).addTo(lmap).on('click', () => {
-                    Swal.fire({
-                        title: v.model,
-                        text: `${v.plate} - ${v.year}`,
-                        confirmButtonText: 'Seç'
+                const pos = [v.lat || (center[0] + (Math.random()-0.5)*0.002), v.lng || (center[1] + (Math.random()-0.5)*0.002)];
+                
+                if (markers[v.id]) {
+                    markers[v.id].setLatLng(pos);
+                } else {
+                    const icon = L.divIcon({
+                        className: 'veh-marker-container',
+                        html: `<div class="veh-marker shadow-neon" style="animation: float 2s ease-in-out infinite;"><i data-lucide="car"></i><span class="v-plate">${v.plate}</span></div>`,
+                        iconSize: [45, 45]
                     });
-                });
+                    markers[v.id] = L.marker(pos, { icon }).addTo(lmap).on('click', () => {
+                        Swal.fire({
+                            title: v.model,
+                            html: `<div class="text-emerald fw-bold">${v.plate}</div><div class="x-small">Konum: Ümraniye / Yamanevler</div>`,
+                            confirmButtonText: 'Seç'
+                        });
+                    });
+                }
             });
             lucide.createIcons();
         }
@@ -516,13 +649,16 @@ async function startRequestFlow() {
             '<label class="x-small text-muted">Araç Seçimi</label>' +
             '<input id="swal-plate" class="swal2-input" placeholder="Araç Plakası">' +
             '<label class="x-small text-muted">Gidiş Amacı</label>' +
-            '<input id="swal-purpose" class="swal2-input" placeholder="Hedef / Sebep">',
+            '<input id="swal-purpose" class="swal2-input" placeholder="Hedef / Sebep">' +
+            '<label class="x-small text-muted">Yakıt Seviyesi (%)</label>' +
+            '<input id="swal-fuel" type="number" class="swal2-input" placeholder="Örn: 80">',
         focusConfirm: false,
         preConfirm: () => {
             const p = document.getElementById('swal-plate').value.trim().toUpperCase();
             const pur = document.getElementById('swal-purpose').value.trim();
-            if(!p || !pur) return Swal.showValidationMessage('Lütfen tüm alanları doldurun.');
-            return { plate: p, purpose: pur }
+            const fuel = document.getElementById('swal-fuel').value;
+            if (!p || !pur || !fuel) return Swal.showValidationMessage('Lütfen tüm alanları doldurun.');
+            return { plate: p, purpose: pur, fuelStart: fuel }
         }
     });
 
@@ -554,17 +690,27 @@ async function startTripFlow() {
 }
 
 async function finishTripFlow() {
-    const { value: km } = await Swal.fire({
+    const { value: formValues } = await Swal.fire({
         title: 'Sürüşü Bitir',
-        text: 'Varış kilometresini girin.',
-        input: 'number',
-        inputPlaceholder: 'Örn: 125450',
+        html:
+            '<label class="x-small text-muted">Varış Kilometresi</label>' +
+            '<input id="swal-f-km" type="number" class="swal2-input" placeholder="Örn: 125450">' +
+            '<label class="x-small text-muted">Bitiş Yakıt Seviyesi (%)</label>' +
+            '<input id="swal-f-fuel" type="number" class="swal2-input" placeholder="Örn: 75">',
+        focusConfirm: false,
         showCancelButton: true,
-        confirmButtonText: 'Fotoğraflara Geç'
+        confirmButtonText: 'Fotoğraflara Geç',
+        preConfirm: () => {
+            const km = document.getElementById('swal-f-km').value;
+            const fuel = document.getElementById('swal-f-fuel').value;
+            if (!km || !fuel) return Swal.showValidationMessage('Tüm alanları doldurun.');
+            return { km, fuel }
+        }
     });
 
-    if (km) {
-        state.finishKm = km;
+    if (formValues) {
+        state.finishKm = formValues.km;
+        state.finishFuel = formValues.fuel;
         state.camera.type = 'end';
         startCameraSequence();
     }
@@ -581,8 +727,8 @@ function startCameraSequence() {
 
 async function startCamera() {
     try {
-        state.camera.stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
+        state.camera.stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
         });
         document.getElementById('camera-video').srcObject = state.camera.stream;
     } catch (e) {
@@ -608,10 +754,10 @@ function capturePhoto() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    
+
     const data = canvas.toDataURL('image/jpeg', 0.7);
     state.camera.photos.push(data);
-    
+
     state.camera.currentStep++;
     if (state.camera.currentStep < state.camera.steps.length) {
         updateCameraUI();
@@ -636,13 +782,13 @@ async function submitRequest() {
         userId: state.user.id,
         userName: state.user.name,
         vehiclePlate: state.activeRequest.plate,
-        vehicleModel: "Araç", 
+        vehicleModel: "Araç",
         purpose: state.activeRequest.purpose,
         photos: state.camera.photos,
         status: 'pending',
         timestamp: new Date().toISOString()
     });
-    
+
     Swal.fire('Gönderildi', 'Talebiniz idareci onayına sunuldu.', 'success');
 }
 
@@ -651,15 +797,16 @@ async function submitTripFinish() {
     const tripData = {
         ...state.activeTrip,
         finishKm: state.finishKm,
+        fuelEnd: state.finishFuel,
         finishTime: new Date().toISOString(),
         photosEnd: state.camera.photos,
         status: 'completed'
     };
-    
+
     // Archive to trips and remove from requests
     await db.ref(`institutions/${state.kurum}/trips/${tripId}`).set(tripData);
     await db.ref(`institutions/${state.kurum}/requests/${tripId}`).remove();
-    
+
     state.activeTrip = null;
     Swal.fire('Tamamlandı', 'Sürüş kaydı başarıyla arşivlendi.', 'success');
 }
@@ -695,11 +842,13 @@ window.addVehicle = async () => {
     const model = document.getElementById('new-v-model').value.trim();
     const plate = document.getElementById('new-v-plate').value.trim().toUpperCase();
     if (!model || !plate) return Swal.fire('Uyarı', 'Lütfen tüm alanları doldurun.', 'warning');
-    
+
     const vRef = db.ref(`institutions/${state.kurum}/config/vehicles`).push();
     await vRef.set({
         id: vRef.key,
-        model, plate, year: 2024, created: new Date().toISOString()
+        model, plate, year: 2024, created: new Date().toISOString(),
+        lat: 41.0287 + (Math.random() - 0.5) * 0.002,
+        lng: 29.1121 + (Math.random() - 0.5) * 0.002
     });
     loadVehicleList();
     Swal.fire('Başarılı', 'Araç filoya eklendi.', 'success');
@@ -765,7 +914,7 @@ window.addPersonnel = async () => {
     const name = document.getElementById('new-p-name').value.trim();
     const pin = document.getElementById('new-p-pin').value.trim();
     if (!name || pin.length !== 4) return Swal.fire('Uyarı', 'İsim ve 4 haneli PIN zorunludur.', 'warning');
-    
+
     const ref = db.ref(`institutions/${state.kurum}/config/personnel`).push();
     await ref.set({ id: ref.key, name, pin, created: new Date().toISOString() });
     loadPersonnelListAdmin();
@@ -809,6 +958,57 @@ async function loadPersonnelListAdmin() {
         </div>
     `).join('');
     lucide.createIcons();
+    initLoginBubbles();
+}
+
+// --- CINEMATIC EFFECTS ---
+function initLoginBubbles() {
+    const container = document.getElementById('loginBubbles');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 0; i < 15; i++) {
+        spawnBubble(container, false);
+    }
+}
+
+function spawnBubble(container, isBurst = false) {
+    const bubble = document.createElement('div');
+    bubble.className = 'login-bubble';
+    const size = isBurst ? (5 + Math.random() * 15) : (20 + Math.random() * 40);
+    bubble.style.width = size + 'px';
+    bubble.style.height = size + 'px';
+    bubble.style.left = Math.random() * 100 + '%';
+    bubble.style.bottom = isBurst ? '50%' : '-60px';
+
+    if (isBurst) {
+        bubble.style.left = (40 + Math.random() * 20) + '%';
+        bubble.style.animationDuration = (0.5 + Math.random() * 1) + 's';
+        bubble.style.background = 'radial-gradient(circle at 30% 30%, #10b981, transparent)';
+        bubble.style.boxShadow = '0 0 15px #10b981';
+    } else {
+        bubble.style.animationDuration = (8 + Math.random() * 12) + 's';
+        bubble.style.animationDelay = (Math.random() * 5) + 's';
+    }
+    container.appendChild(bubble);
+    if (isBurst) setTimeout(() => bubble.remove(), 1500);
+}
+
+function triggerLoginCinematic() {
+    const splash = document.getElementById('splash-screen');
+    const container = document.getElementById('loginBubbles');
+    if (!splash || !container) return;
+
+    for (let i = 0; i < 40; i++) {
+        setTimeout(() => spawnBubble(container, true), i * 15);
+    }
+
+    splash.style.opacity = '0';
+    splash.style.transform = 'scale(1.2)';
+    splash.style.filter = 'blur(20px)';
+
+    setTimeout(() => {
+        splash.style.display = 'none';
+    }, 800);
 }
 
 function toggleTheme() {
