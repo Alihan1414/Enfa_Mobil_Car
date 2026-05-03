@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>YurtAraç Kurumsal Yönetim Sistemi</title>
+    
+    <meta name="description" content="YurtAraç Kurumsal Araç Yönetim ve Takip Platformu.">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
++    <div class="aurora-container"></div>
+
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen" style="background-color: #10B981 !important;">
+        <div class="logo-container">
+            <div class="brand-icon">🚐</div>
+            <div class="yurtarac-logo">YurtAraç</div>
+            <div class="loading-bar"></div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main id="app" class="hidden">
+        
+        <section id="gate-institution" class="gate-view active">
+            <div class="gate-content glass-card p-5">
+                <div class="brand-badge shadow-neon">YA</div>
+                <h2>Kurum Kodu</h2>
+                <p>Lütfen kurumunuza özel kodu giriniz.</p>
+                <div class="input-group">
+                    <input type="text" id="institution-code" placeholder="Örn: YURT01" maxlength="10">
+                    <button class="primary-btn" id="btn-enter-institution">Giriş Yap</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: LOGIN GATE (Admin or Personnel) -->
+        <section id="gate-login" class="gate-view">
+            <div class="gate-header">
+                <button class="back-btn" id="btn-back-to-institution"><i data-lucide="arrow-left"></i></button>
+                <span id="display-institution-name">KURUM KODU</span>
+            </div>
+            <div class="gate-content">
+                <div class="login-tabs">
+                    <button class="tab-btn active" data-role="personnel">Personel</button>
+                    <button class="tab-btn" data-role="admin">İdareci</button>
+                </div>
+
+                <!-- Personnel Login -->
+                <div id="login-personnel" class="login-form-container active">
+                    <select id="personnel-select" class="custom-select">
+                        <option value="">Lütfen İsminizi Seçin</option>
+                    </select>
+                    <input type="password" id="personnel-pin" placeholder="PIN Kodunuz" maxlength="4">
+                    <button class="primary-btn" id="btn-login-personnel">Sisteme Gir</button>
+                </div>
+
+                <!-- Admin Login/Register -->
+                <div id="login-admin" class="login-form-container">
+                    <input type="password" id="admin-password" placeholder="İdareci Şifresi">
+                    <p id="admin-note" class="small-note"></p>
+                    <button class="primary-btn" id="btn-login-admin">İdare Paneline Gir</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: PANELS (The App Itself) -->
+        <div id="panel-container" class="hidden">
+            
+            <!-- A: Personnel Panel -->
+            <div id="panel-personnel" class="role-panel hidden">
+                <header class="panel-header">
+                    <div class="user-info-mini">
+                        <div class="mini-avatar">YA</div>
+                        <div>
+                            <h4 id="user-display-name">İsim Soyisim</h4>
+                            <span id="user-display-status">Personel</span>
+                        </div>
+                    </div>
+                    <button class="logout-btn"><i data-lucide="log-out"></i></button>
+                </header>
+
+                <div class="panel-body">
+                    <!-- Personnel Map View -->
+                    <div id="personnel-main" class="p-view active">
+                        <div id="map"></div>
+                        <div class="floating-controls">
+                            <div id="request-status-pill" class="status-pill hidden">
+                                <span class="pulse"></span> <span id="status-text">ONAY BEKLİYOR</span>
+                            </div>
+                            <button id="btn-action-main" class="main-action-btn">
+                                <i data-lucide="car"></i> Araç Talep Et
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Personnel History View -->
+                    <div id="personnel-requests" class="p-view p-4 scrollable">
+                        <h3 class="mb-4 text-emerald">Sürüş Geçmişim</h3>
+                        <div id="personnel-history-list">
+                            <div class="empty-state">Henüz bir sürüş kaydı yok.</div>
+                        </div>
+                    </div>
+
+                    <!-- Personnel Profile View -->
+                    <div id="personnel-profile" class="p-view p-4">
+                        <div class="glass-card p-4 text-center">
+                            <div class="brand-badge mx-auto mb-3">YA</div>
+                            <h2 id="profile-name" class="h4 mb-1">-</h2>
+                            <p id="profile-kurum" class="x-small text-emerald fw-bold mb-4">-</p>
+                            <div class="text-start border-top border-secondary border-opacity-25 pt-4">
+                                <div class="mb-3">
+                                    <label class="x-small text-muted d-block">Rol</label>
+                                    <span class="fw-bold">Personel / Şoför</span>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="x-small text-muted d-block">Kurum</label>
+                                    <span id="profile-kurum-full" class="fw-bold">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="bottom-nav">
+                    <div class="nav-item active" data-pview="main"><i data-lucide="map"></i><span>Harita</span></div>
+                    <div class="nav-item" data-pview="requests"><i data-lucide="history"></i><span>Geçmiş</span></div>
+                    <div class="nav-item" data-pview="profile"><i data-lucide="user"></i><span>Profil</span></div>
+                </nav>
+            </div>
+
+            <!-- B: Admin Panel -->
+            <div id="panel-admin" class="role-panel hidden">
+                <header class="panel-header">
+                    <div class="admin-title">
+                        <h2>İdari Yönetim</h2>
+                        <span id="admin-inst-display">KURUM KODU</span>
+                    </div>
+                    <button class="logout-btn"><i data-lucide="log-out"></i></button>
+                </header>
+
+                <div class="panel-body scrollable">
+                    <div class="admin-stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-val" id="stat-active-trips">0</span>
+                            <span class="stat-lbl">Aktif Sürüş</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val" id="stat-pending-reqs">0</span>
+                            <span class="stat-lbl">Onay Bekleyen</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-menu">
+                        <button class="menu-btn active" data-aview="approvals">
+                            <i data-lucide="clipboard-check"></i> Onay Kuyruğu <span class="count-badge hidden" id="approval-count">0</span>
+                        </button>
+                        <button class="menu-btn" data-aview="vehicles">
+                            <i data-lucide="car"></i> Araç Filosu
+                        </button>
+                        <button class="menu-btn" data-aview="personnel">
+                            <i data-lucide="users"></i> Personel Listesi
+                        </button>
+                        <button class="menu-btn" data-aview="reports">
+                            <i data-lucide="bar-chart-2"></i> Raporlar
+                        </button>
+                    </div>
+
+                    <div id="admin-content" class="admin-view-content">
+                        <!-- Views will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Camera Overlay -->
+    <div id="camera-overlay" class="camera-overlay hidden">
+        <div class="camera-header">
+            <h3 id="camera-step-title">Ön Fotoğraf</h3>
+            <p>Lütfen net bir kare çekin</p>
+        </div>
+        <div class="video-container">
+            <video id="camera-video" autoplay playsinline muted></video>
+            <div class="camera-guides">
+                <div class="guide-box"></div>
+            </div>
+        </div>
+        <div class="camera-controls">
+            <button id="btn-cancel-camera" class="cam-btn secondary">İptal</button>
+            <button id="btn-capture" class="cam-btn primary"><i data-lucide="camera"></i></button>
+        </div>
+        <canvas id="camera-canvas" class="hidden"></canvas>
+    </div>
+
+    <!-- Firebase SDKs (v8 legacy for easy integration like TopClean) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script src="app.js"></script>
+</body>
+</html>
