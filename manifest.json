@@ -1,0 +1,16 @@
+{
+  "name": "YurtAraç Kurumsal Yönetim",
+  "short_name": "YurtAraç",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#10B981",
+  "icons": [
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
